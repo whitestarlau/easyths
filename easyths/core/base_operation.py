@@ -239,6 +239,25 @@ class BaseOperation(ABC, Generic[Ps]):
         """睡眠指定秒数"""
         time.sleep(seconds)
 
+    def set_edit_verified(self, control: Any, text: str) -> bool:
+        """清空输入框后写入文本，并回读校验。
+
+        客户端会在输入代码后自动填充价格/数量；输入框未清空时直接 ``type_keys``
+        可能与残留值拼接出多余小数位（本次故障现场价格框为 0.90975，触发
+        “委托价格的小数部分应为 3 位”弹窗）。这里先全选删除再输入，并回读确认，
+        必要时用 ``set_edit_text`` 兜底。
+        """
+        control.type_keys("^a")
+        control.type_keys("{DEL}")
+        control.type_keys(text)
+        if control.window_text().strip() == text:
+            return True
+        try:
+            control.set_edit_text(text)
+        except Exception:
+            return False
+        return control.window_text().strip() == text
+
     def wait_for_pop_dialog(self, timeout: float = 1.0) -> bool:
         """等待弹窗出现"""
         start = time.perf_counter()

@@ -127,7 +127,10 @@ def test_reverse_repo_amount_unit():
 
 
 def test_format_price_precision():
-    # ETF/可转债（5/1 开头）3 位小数，其余 2 位
-    assert format_price("510300", 1.2345) == "1.234"
+    # ETF/可转债（5/1 开头）3 位小数，其余 2 位；小数位一律向上取整
+    assert format_price("510300", 1.2345) == "1.235"
+    assert format_price("510300", 1.4322) == "1.433"
+    assert format_price("510300", 1.432) == "1.432"
     assert format_price("113000", 100.5) == "100.500"
     assert format_price("600000", 10.5) == "10.50"
+    assert format_price("600000", 10.501) == "10.51"

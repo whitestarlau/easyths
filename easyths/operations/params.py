@@ -5,6 +5,7 @@ REST 提交时校验（未知/非法参数直接 422），队列执行时复用�
 接口文档（/operations/ 列表与 OpenAPI schema）由模型自动生成。
 """
 
+import math
 from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
@@ -30,12 +31,18 @@ MAX_ORDER_AMOUNT = 10_000_000
 
 
 def format_price(stock_code: str, price: float) -> str:
-    """按标的类型格式化价格文本。
+    """按标的类型格式化价格文本（小数位向上取整，绝不向下舍入）。
 
-    ETF/可转债（5/1 开头）支持 3 位小数，其余标的 2 位
+    ETF/可转债（5/1 开头）3 位小数，其余标的 2 位。价格未对齐最小报价单位时
+    一律向上取整（1.4322 → 1.433），避免四舍五入后仍有多余小数，触发客户端
+    “委托价格的小数部分应为 3 位”并导致委托被拒。
     https://github.com/noimank/easyths/issues/6
     """
-    return f"{price:.3f}" if stock_code.startswith(("5", "1")) else f"{price:.2f}"
+    decimals = 3 if stock_code.startswith(("5", "1")) else 2
+    factor = 10**decimals
+    # 先 round 掉浮点误差，再 ceil，避免 1.432 被抬成 1.433
+    units = math.ceil(round(price * factor, 6))
+    return f"{units / factor:.{decimals}f}"
 
 
 def _lot_error(stock_code: str, quantity: int) -> str | None:
