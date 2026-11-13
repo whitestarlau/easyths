@@ -239,24 +239,15 @@ class BaseOperation(ABC, Generic[Ps]):
         """睡眠指定秒数"""
         time.sleep(seconds)
 
-    def set_edit_verified(self, control: Any, text: str) -> bool:
-        """清空输入框后写入文本，并回读校验。
+    def overwrite_edit(self, control: Any, text: str) -> None:
+        """双击选中输入框整段内容后键入，实现覆盖而不是追加。
 
-        客户端会在输入代码后自动填充价格/数量；输入框未清空时直接 ``type_keys``
-        可能与残留值拼接出多余小数位（本次故障现场价格框为 0.90975，触发
-        “委托价格的小数部分应为 3 位”弹窗）。这里先全选删除再输入，并回读确认，
-        必要时用 ``set_edit_text`` 兜底。
+        这版客户端的价格/数量框不响应 Ctrl+A、Home/Delete（键入会追加到残留值
+        后面，拼出 0.90975 这类非法价格），但鼠标双击可以选中整段内容，随后
+        键入即完成替换。切换页面也不会清空表单，所以每个字段都必须显式覆盖。
         """
-        control.type_keys("^a")
-        control.type_keys("{DEL}")
+        control.double_click_input()
         control.type_keys(text)
-        if control.window_text().strip() == text:
-            return True
-        try:
-            control.set_edit_text(text)
-        except Exception:
-            return False
-        return control.window_text().strip() == text
 
     def wait_for_pop_dialog(self, timeout: float = 1.0) -> bool:
         """等待弹窗出现"""

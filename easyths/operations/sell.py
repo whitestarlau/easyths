@@ -40,39 +40,25 @@ class SellOperation(BaseOperation[LimitOrderParams]):
             auto_id="59648",
         ).children(class_name="AfxMDIFrame140s")[0]
 
-        # 1. 输入股票代码
-        self.get_control_with_children(
-            main_panel, control_type="Edit", auto_id="1032"
-        ).type_keys(stock_code)
-        self.sleep(0.08)
-        # 2. 输入价格（清空后写入并回读校验，避免与自动填充值拼接）
-        price_edit = self.get_control_with_children(
-            main_panel, control_type="Edit", auto_id="1033"
+        # 1. 输入股票代码（双击覆盖，避免与残留值拼接）
+        self.overwrite_edit(
+            self.get_control_with_children(main_panel, control_type="Edit", auto_id="1032"),
+            stock_code,
         )
-        if not self.set_edit_verified(price_edit, price):
-            return self._fail(
-                f"卖出价格输入校验失败：期望 {price}，实际 {price_edit.window_text()!r}",
-                ErrorCode.UI_ERROR,
-            )
+        self.sleep(0.08)
+        # 2. 输入价格
+        self.overwrite_edit(
+            self.get_control_with_children(main_panel, control_type="Edit", auto_id="1033"),
+            price,
+        )
         self.sleep(0.08)
         # 3. 输入数量
-        qty_edit = self.get_control_with_children(
-            main_panel, control_type="Edit", auto_id="1034"
+        self.overwrite_edit(
+            self.get_control_with_children(main_panel, control_type="Edit", auto_id="1034"),
+            str(params.quantity),
         )
-        if not self.set_edit_verified(qty_edit, str(params.quantity)):
-            return self._fail(
-                f"卖出数量输入校验失败：期望 {params.quantity}，实际 {qty_edit.window_text()!r}",
-                ErrorCode.UI_ERROR,
-            )
         # 等待输入数量后稳定在确认
         self.sleep(0.3)
-        # 提交前再校验一次价格，防止客户端在此间隙自动填充覆盖
-        if price_edit.window_text().strip() != price:
-            if not self.set_edit_verified(price_edit, price):
-                return self._fail(
-                    f"卖出价格在提交前被改写：期望 {price}，实际 {price_edit.window_text()!r}",
-                    ErrorCode.UI_ERROR,
-                )
         # 4. 提交委托
         main_window.type_keys("{ENTER}")
         self.wait_for_pop_dialog(0.3)
