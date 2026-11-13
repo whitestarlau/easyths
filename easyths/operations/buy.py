@@ -61,9 +61,29 @@ class BuyOperation(BaseOperation[LimitOrderParams]):
         self.sleep(0.3)
         # 4. 提交委托
         main_window.type_keys("{ENTER}")
-        self.wait_for_pop_dialog(0.3)
-        # 没弹窗就是成功，这里已经假设用户已经按照项目设置好软件，
-        # 为了加快操作速度，去掉了多余的弹窗处理（因为设置好软件后不会有弹窗）
+        # 委托确认弹窗可能稍晚出现，多等一会儿；确认后再等成功提示
+        self.wait_for_pop_dialog(0.8)
+        pop_title, pop_control = self.get_pop_dialog()
+        if pop_title == "委托确认窗口":
+            if not self.confirm_order_dialog(pop_control):
+                return self._fail(
+                    "委托确认弹窗无法点击“是”，委托未提交", ErrorCode.UI_ERROR
+                )
+            self.sleep(0.4)
+            self.wait_for_pop_dialog(1.0)
+            pop_title, pop_control = self.get_pop_dialog()
+
+        # 成功提示（含合同编号）本身就是提交成功的证据，不能当成被拒
+        pop_content = self.get_pop_dialog_content() or ""
+        if "成功提交" in pop_content or "合同编号" in pop_content:
+            self.close_pop_dialog()
+            return self._ok(
+                data=LimitOrderResult(
+                    stock_code=stock_code, price=params.price, quantity=params.quantity
+                ).model_dump(),
+                message=f"成功提交{stock_code}的买入委托",
+            )
+
         is_op_success = not self.is_exist_pop_dialog()
         # 证券名称，如果提交成功，stock_name 会清空
         stock_name = self.get_control_with_children(

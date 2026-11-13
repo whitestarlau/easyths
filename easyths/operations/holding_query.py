@@ -15,14 +15,34 @@ class HoldingQueryOperation(BaseOperation[EmptyParams]):
     Params = EmptyParams
     Result = HoldingRow
 
+    @staticmethod
+    def _int_field(record: dict[str, Any], *keys: str) -> int:
+        """按列名顺序取第一个非 0 的整数。
+
+        剪贴板字段都是字符串，``'0'`` 也是真值，不能直接用 ``or`` 回退；
+        新版客户端 T+1 当日买入时「股票余额」为 '0'，股数在「实际数量」列。
+        """
+        for key in keys:
+            value = record.get(key)
+            if value is None:
+                continue
+            try:
+                number = int(float(str(value).replace(",", "")))
+            except Exception:
+                continue
+            if number != 0:
+                return number
+        return 0
+
     def parse_holding_row(self, record: dict[str, Any]) -> HoldingRow:
         """剪贴板持仓记录 → 行模型（显式字段装配，列名差异在此适配）"""
         return HoldingRow(
             stock_code=record["证券代码"],
             stock_name=record["证券名称"],
-            # 列名差异：实盘为「持仓数量/可用数量」，模拟账户为「股票余额/可用余额」（语义相同）
-            quantity=record.get("持仓数量") or record.get("股票余额"),
-            available_quantity=record.get("可用数量") or record.get("可用余额"),
+            # 列名差异：实盘为「持仓数量/可用数量」，模拟账户为「股票余额/可用余额」（语义相同）；
+            # 新版客户端 T+1 当日买入时「股票余额」为 0、股数在「实际数量」列，需要回退
+            quantity=self._int_field(record, "持仓数量", "股票余额", "实际数量"),
+            available_quantity=self._int_field(record, "可用数量", "可用余额"),
             frozen_quantity=record["冻结数量"],
             # 列名差异：实盘为「参考成本价」，模拟账户为「成本价」
             cost_price=record.get("参考成本价") or record.get("成本价"),

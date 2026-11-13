@@ -249,6 +249,28 @@ class BaseOperation(ABC, Generic[Ps]):
         control.double_click_input()
         control.type_keys(text)
 
+    def confirm_order_dialog(self, pop_control: Any) -> bool:
+        """点击“委托确认”弹窗的“是(Y)”，客户端才会真正提交委托。
+
+        客户端开启“委托确认”后，按回车只会弹出模态框，按钮为
+        是(Y)=auto_id 6、否(N)=auto_id 7；不点“是”委托不会发出。
+        """
+        if pop_control is None:
+            return False
+        try:
+            buttons = pop_control.descendants(control_type="Button")
+        except Exception:
+            return False
+        for button in buttons:
+            try:
+                text = button.window_text()
+                if button.element_info.automation_id == "6" or text.startswith("是"):
+                    button.click_input()
+                    return True
+            except Exception:
+                continue
+        return False
+
     def wait_for_pop_dialog(self, timeout: float = 1.0) -> bool:
         """等待弹窗出现"""
         start = time.perf_counter()
@@ -328,6 +350,8 @@ class BaseOperation(ABC, Generic[Ps]):
                 return "数据发送错误提示", children
             elif "委托确认" in content:
                 return "委托确认窗口", children
+            elif "成功提交" in content or "合同编号" in content:
+                return "委托成功提示", children
             else:
                 pass
 
@@ -432,6 +456,12 @@ class BaseOperation(ABC, Generic[Ps]):
                 ).click()
                 # Alt+N 确认（% = Alt，^ = Ctrl，+ = Shift）
                 # pop_control.type_keys("%n")
+
+            elif pop_dialog_title == "委托成功提示":
+                # 点“确定”关闭成功提示
+                self.get_control_with_children(
+                    pop_control, control_type="Button", auto_id="2", class_name="Button"
+                ).click()
 
             else:
                 try:
